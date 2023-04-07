@@ -61,7 +61,8 @@ var createActionHistory = (function() {
             refreshUndoRedo = function(extraAction) {
                 var currentActionIndex;
                 currentAction === null ?
-                (currentHisStatus.undoable = false,
+                (
+                    currentHisStatus.undoable = false,
                     currentHisStatus.redoable = false,
                     undoableAction = null,
                     redoableAction = null) :
@@ -85,13 +86,13 @@ var createActionHistory = (function() {
 
             reset: function(extraAction) {
                 currentActionId = initActionId;
-                    actionHis.length = 0;
-                    currentAction = null;
-                    currentHisStatus = {
-                        undoable: false,
-                        redoable: false
-                    };
-                    refreshUndoRedo(extraAction);
+                actionHis.length = 0;
+                currentAction = null;
+                currentHisStatus = {
+                      undoable: false,
+                      redoable: false
+                };
+                refreshUndoRedo(extraAction);
             },
 
             executeAction: function(extraAction, actionFunc, undoFunc, redoFunc) {
