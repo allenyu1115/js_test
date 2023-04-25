@@ -30,138 +30,134 @@ var isSameArrayObjs = (function () {
     };
   })();
 
-var createActionHistory = (function() {
-    var actionStatus = {
-        Undoable: 1,
-        Redoable: 2
-    };
-    return function(initActionId) {
-        var actionHis = [],
-          currentHisStatus = {
+var createActionHistory = (function () {
+  var actionStatus = {
+    Undoable: 1,
+    Redoable: 2,
+  };
+  return function (initActionId) {
+    var actionHis = [],
+      currentHisStatus = {
+        undoable: false,
+        redoable: false,
+      },
+      currentAction = null,
+      undoableAction = null,
+      redoableAction = null,
+      currentActionId = initActionId,
+      findUndoable = function (currentIndex) {
+        while (currentIndex >= 0) {
+          if (actionHis[currentIndex].state === actionStatus.Undoable) {
+            return actionHis[currentIndex];
+          }
+          currentIndex--;
+        }
+        return null;
+      },
+      findRedoable = function (currentIndex) {
+        while (currentIndex < actionHis.length) {
+          if (actionHis[currentIndex].state === actionStatus.Redoable) {
+            return actionHis[currentIndex];
+          }
+          currentIndex++;
+        }
+        return null;
+      },
+      refreshUndoRedo = function (extraAction) {
+        var currentActionIndex;
+        currentAction === null
+          ? ((currentHisStatus.undoable = false),
+            (currentHisStatus.redoable = false),
+            (undoableAction = null),
+            (redoableAction = null))
+          : ((currentActionIndex = actionHis.indexOf(currentAction)),
+            (undoableAction = findUndoable(currentActionIndex)),
+            (redoableAction = findRedoable(currentActionIndex)),
+            (currentHisStatus.undoable = undoableAction !== null),
+            (currentHisStatus.redoable = redoableAction !== null)),
+          typeof extraAction === "function" &&
+            extraAction(currentHisStatus.undoable, currentHisStatus.redoable);
+      };
+    return {
+      undo: function () {
+        undoableAction && undoableAction.action();
+      },
+      redo: function () {
+        redoableAction && redoableAction.action();
+      },
+
+      reset: function (extraAction) {
+        (currentActionId = initActionId),
+          (actionHis.length = 0),
+          (currentAction = null),
+          (currentHisStatus = {
             undoable: false,
             redoable: false,
-          },
-          currentAction = null,
-          undoableAction = null,
-          redoableAction = null,
-          currentActionId = initActionId,
-          findUndoable = function (currentIndex) {
-            while (currentIndex >= 0) {
-              if (actionHis[currentIndex].state === actionStatus.Undoable) {
-                return actionHis[currentIndex];
-              }
-              currentIndex--;
-            }
-            return null;
-          },
-          findRedoable = function (currentIndex) {
-            while (currentIndex < actionHis.length) {
-              if (actionHis[currentIndex].state === actionStatus.Redoable) {
-                return actionHis[currentIndex];
-              }
-              currentIndex++;
-            }
-            return null;
-          },
-          refreshUndoRedo = function (extraAction) {
-            var currentActionIndex;
-            currentAction === null
-              ? ((currentHisStatus.undoable = false),
-                (currentHisStatus.redoable = false),
-                (undoableAction = null),
-                (redoableAction = null))
-              : ((currentActionIndex = actionHis.indexOf(currentAction)),
-                (undoableAction = findUndoable(currentActionIndex)),
-                (redoableAction = findRedoable(currentActionIndex)),
-                (currentHisStatus.undoable = undoableAction !== null),
-                (currentHisStatus.redoable = redoableAction !== null)),
-              typeof extraAction === "function" &&
-                extraAction(
-                  currentHisStatus.undoable,
-                  currentHisStatus.redoable
-                );
-          };
-        return {
+          }),
+          refreshUndoRedo(extraAction);
+      },
 
-            undo: function() {
-                undoableAction && undoableAction.action()
+      executeAction: function (extraAction, actionFunc, undoFunc, redoFunc) {
+        actionFunc = actionFunc || function () {};
+        actionFunc(),
+          (currentActionId = currentActionId + 1),
+          actionHis.push({
+            id: currentActionId,
+            state: actionStatus.Undoable,
+            action: function () {
+              this.state === actionStatus.Undoable
+                ? (undoFunc(), (this.state = actionStatus.Redoable))
+                : ((redoFunc || actionFunc)(),
+                  (this.state = actionStatus.Undoable)),
+                (currentAction = this),
+                refreshUndoRedo(extraAction);
             },
-            redo: function() {
-                redoableAction && redoableAction.action()
-            },
-
-            reset: function(extraAction) {
-                currentActionId = initActionId,
-                    actionHis.length = 0,
-                    currentAction = null,
-                    currentHisStatus = {
-                        undoable: false,
-                        redoable: false
-                    },
-                    refreshUndoRedo(extraAction)
-            },
-
-            executeAction: function(extraAction, actionFunc, undoFunc, redoFunc) {
-                actionFunc = actionFunc || function(){};
-                actionFunc(),
-                    currentActionId = currentActionId + 1,
-                    actionHis.push({
-                        id: currentActionId,
-                        state: actionStatus.Undoable,
-                        action: function() {
-                            this.state === actionStatus.Undoable ?
-                                (undoFunc(), this.state = actionStatus.Redoable) :
-                                ((redoFunc || actionFunc)(), this.state = actionStatus.Undoable),
-                                currentAction = this,
-                                refreshUndoRedo(extraAction)
-                        }
-                    }),
-                    currentAction = actionHis[actionHis.length - 1],
-                    refreshUndoRedo(extraAction)
-            }
-        }
-    }
-
+          }),
+          (currentAction = actionHis[actionHis.length - 1]),
+          refreshUndoRedo(extraAction);
+      },
+    };
+  };
 })();
 
-var actionHistoryRedoUndo = function() {
-       var undoAction = []
-       var redoAction = []   
-       var currentStatus = {
-              undoable: false,
-              redoable: false
-       };
-       return {
-            undo: function() {
-                 var first = undoAction.pop();
-                 first&&first.undo();
-                 undoAction.length === 0 && (currentStatus.undoable = false);
-                 redoAction.push(first);
-                 currentStatus.redoable= true;           
-            },
-            redo: function() {
-                var redoFirst = redoAction.pop();
-                redoFirst&&redoFirst.doit();
-                redoAction.length === 0 && (currentStatus.redoable = false);
-                undoAction.push(redoFirst);
-                currentStatus.undoable = true;
-            },
+var actionHistoryRedoUndo = function () {
+  var undoAction = [];
+  var redoAction = [];
+  var currentStatus = {
+    undoable: false,
+    redoable: false,
+  };
+  return {
+    undo: function () {
+      var first = undoAction.pop();
+      first && first.undo();
+      undoAction.length === 0 && (currentStatus.undoable = false);
+      redoAction.push(first);
+      currentStatus.redoable = true;
+    },
+    redo: function () {
+      var redoFirst = redoAction.pop();
+      redoFirst && redoFirst.doit();
+      redoAction.length === 0 && (currentStatus.redoable = false);
+      undoAction.push(redoFirst);
+      currentStatus.undoable = true;
+    },
 
-            reset: function() {
-              undoAction.length = 0;
-              redoAction.length = 0;
-              currentStatus.undoable = false;
-              currentStatus.redoable = false;
-            },
+    reset: function () {
+      undoAction.length = 0;
+      redoAction.length = 0;
+      currentStatus.undoable = false;
+      currentStatus.redoable = false;
+    },
 
-            executeAction: function(actionFunc) {            
-                actionFunc.doit();                
-                undoAction.push(actionFunc);
-                currentStatus.undoable = true;
-            },
+    executeAction: function (actionFunc) {
+      actionFunc.doit();
+      undoAction.push(actionFunc);
+      currentStatus.undoable = true;
+    },
 
-             actionForUndoRedoStatus(extraAction){
-                 extraAction(currentStatus.undoable, currentStatus.redoable);
-             }
-        }
-}
+    actionForUndoRedoStatus(extraAction) {
+      extraAction(currentStatus.undoable, currentStatus.redoable);
+    },
+  };
+};
