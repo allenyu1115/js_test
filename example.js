@@ -160,3 +160,22 @@ var actionHistoryRedoUndo = function() {
              }
         }
 }
+var findUndoable = function(currentIndex) {
+    while (currentIndex >= 0) {
+        if (actionHis[currentIndex].state === actionStatus.Undoable) {
+            return actionHis[currentIndex];
+        }
+        currentIndex--;
+    }
+    return null;
+};
+
+var findRedoable = function(currentIndex) {
+    while (currentIndex < actionHis.length) {
+        if (actionHis[currentIndex].state === actionStatus.Redoable) {
+            return actionHis[currentIndex];
+        }
+        currentIndex++;
+    }
+    return null;
+};
