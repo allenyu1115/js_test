@@ -117,3 +117,31 @@ var createActionHistory = (function() {
     }
 
 })();
+
+
+var actionHistoryRedoUndo = function() {
+       var undoAction = []
+       var redoAction = []                 
+       return {
+            undo: function() {
+                 var first = undoAction.pop();
+                 first&&first.undo();
+                 redoAction.push(first);
+            },
+            redo: function() {
+                var redoFirst = redoAction.pop();
+                redoFirst&&redoFirst.doit();
+                undoAction.push(redoFirst);
+            },
+
+            reset: function() {
+              undoAction.length = 0;
+              redoAction.length = 0;
+            },
+
+            executeAction: function(actionFunc) {            
+                actionFunc.doit();
+                undoAction.push(actionFunc);
+            }
+        }
+}
