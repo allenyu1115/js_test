@@ -121,27 +121,42 @@ var createActionHistory = (function() {
 
 var actionHistoryRedoUndo = function() {
        var undoAction = []
-       var redoAction = []                 
+       var redoAction = []   
+       var currentStatus = {
+              undoable: false,
+              redoable: false
+       };
        return {
             undo: function() {
                  var first = undoAction.pop();
                  first&&first.undo();
+                 undoAction.length === 0 && (currentStatus.undoable = false);
                  redoAction.push(first);
+                 currentStatus.redoable= true;           
             },
             redo: function() {
                 var redoFirst = redoAction.pop();
                 redoFirst&&redoFirst.doit();
+                redoAction.length === 0 && (currentStatus.redoable = false);
                 undoAction.push(redoFirst);
+                currentStatus.undoable = true;
             },
 
             reset: function() {
               undoAction.length = 0;
               redoAction.length = 0;
+              currentStatus.undoable = false;
+              currentStatus.redoable = false;
             },
 
             executeAction: function(actionFunc) {            
-                actionFunc.doit();
+                actionFunc.doit();                
                 undoAction.push(actionFunc);
-            }
+                currentStatus.undoable = true;
+            },
+
+             actionForUndoRedoStatus(extraAction){
+                 extraAction(currentStatus.undoable, currentStatus.redoable);
+             }
         }
 }
