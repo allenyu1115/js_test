@@ -120,44 +120,59 @@ var createActionHistory = (function () {
   };
 })();
 
-var actionHistoryRedoUndo = function () {
+var createActionHistory = function (initActionId) {
   var undoAction = [];
   var redoAction = [];
+  var currentActionId = initActionId;
   var currentStatus = {
     undoable: false,
     redoable: false,
   };
+  var refreshUndoRedo = function (extraAction) {
+    extraAction(currentStatus.undoable, currentStatus.redoable);
+  };
   return {
     undo: function () {
       var first = undoAction.pop();
-      first && first.undo();
+      first && first.undoFunc();
       undoAction.length === 0 && (currentStatus.undoable = false);
-      redoAction.push(first);
-      currentStatus.redoable = true;
+      if (first) {
+        redoAction.push(first);
+        currentStatus.redoable = true;
+        first.extraAction(currentStatus.undoable, currentStatus.redoable);
+      }
     },
     redo: function () {
       var redoFirst = redoAction.pop();
-      redoFirst && redoFirst.doit();
+      redoFirst && redoFirst.redoFunc();
       redoAction.length === 0 && (currentStatus.redoable = false);
-      undoAction.push(redoFirst);
-      currentStatus.undoable = true;
+      if (redoFirst) {
+        undoAction.push(redoFirst);
+        currentStatus.undoable = true;
+        redoFirst.extraAction(currentStatus.undoable, currentStatus.redoable);
+      }
     },
 
-    reset: function () {
+    reset: function (extraAction) {
       undoAction.length = 0;
       redoAction.length = 0;
       currentStatus.undoable = false;
       currentStatus.redoable = false;
+      refreshUndoRedo(extraAction);
     },
 
-    executeAction: function (actionFunc) {
-      actionFunc.doit();
-      undoAction.push(actionFunc);
+    executeAction: function (extraAction, actionFunc, undoFunc, redoFunc) {
+      actionFunc = actionFunc || function () {};
+      actionFunc();
+      currentActionId = currentActionId + 1;
+      undoAction.push({
+        actionId: currentActionId,
+        undoFunc: undoFunc,
+        redoFunc: redoFunc || actionFunc,
+        extraAction: extraAction,
+      });
       currentStatus.undoable = true;
-    },
-
-    actionForUndoRedoStatus(extraAction) {
-      extraAction(currentStatus.undoable, currentStatus.redoable);
+      refreshUndoRedo(extraAction);
     },
   };
 };
