@@ -1,0 +1,13 @@
+#show {
+	display:block;
+	cursor: pointer;
+	text-decoration: underline;
+	color: auto;
+}
+
+#mydefault {
+	line-height: 1.5em;
+	width: 455px;
+	height: 1em;
+	overflow: hidden;
+}
