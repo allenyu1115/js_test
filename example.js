@@ -14,11 +14,16 @@ var deco = function () {
   };
 
 
-var decofun = function(obj,func){
-     obj[func] = function(){     	    
-        return obj.__proto__[func].call(obj,arguments);      
+var decofun = function(obj,func,predict,extrafunc){
+     obj[func] = function(){
+        if((predict || function(){return true})(arguments)){
+          extrafunc && extrafunc(arguments);
+		  return obj.__proto__[func].call(obj,arguments);
+        }
+              
      }
 }
+
 var isSameArrayObjs = (function () {
     var JSONstringifyOrder = function (obj) {
       var allKeys = new Set();
