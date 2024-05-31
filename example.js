@@ -13,6 +13,12 @@ var deco = function () {
     });
   };
 
+
+var decofun = function(obj,func){
+     obj[func] = function(){     	    
+        return obj.__proto__[func].call(obj,arguments);      
+     }
+}
 var isSameArrayObjs = (function () {
     var JSONstringifyOrder = function (obj) {
       var allKeys = new Set();
