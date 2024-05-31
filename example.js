@@ -23,9 +23,7 @@ var decofun = function(obj,func,predict,extrafunc){
               
      }
 }
-decofun(mainMap,'fitBounds',function(a){
-    return a[0].isValid();   
-}, function(a){console.log(a)});
+
 
 var isSameArrayObjs = (function () {
     var JSONstringifyOrder = function (obj) {
