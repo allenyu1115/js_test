@@ -192,3 +192,51 @@ var createActionHistory = (function () {
 })();
 
 
+async function getEpicsWithoutMasterConfig() {
+    const JIRA_URL = "https://aspiraconnect.atlassian.net";
+    const JIRA_USER = "test";
+    const JIRA_API_TOKEN = "test";
+    const authHeader = "Basic " + btoa(`${JIRA_USER}:${JIRA_API_TOKEN}`);
+
+    let epicQuery = `${JIRA_URL}/rest/api/3/search?jql=issuetype=Epic AND "Scrum Team[Dropdown]" in (AO3,AO2) and sprint in openSprints() and project ="AWO Product Development"&fields=key,summary`;
+
+    let response = await fetch(epicQuery, {
+        method: "GET",
+        headers: {
+            "Authorization": authHeader,
+            "Accept": "application/json"
+        }
+    });
+
+    if (!response.ok) {
+        console.error("Error fetching Epics:", await response.text());
+        return;
+    }
+    let epics = (await response.json()).issues;
+    let epicsWithoutMasterConfig = [];
+    for (let epic of epics) {
+        let epicKey = epic.key;
+        let childIssueQuery = `${JIRA_URL}/rest/api/3/search?jql="Epic Link"=${epicKey}&fields=issuetype,summary`;
+        let childResponse = await fetch(childIssueQuery, {
+            method: "GET",
+            headers: {
+                "Authorization": authHeader,
+                "Accept": "application/json"
+            }
+        });
+        if (!childResponse.ok) {
+            console.error(`Error fetching child issues for ${epicKey}:`, await childResponse.text());
+            continue;
+        }
+        let childIssues = (await childResponse.json()).issues || [];
+        let hasMasterConfig = childIssues.some(issue => issue.fields.issuetype.name.includes("Master Config"));
+        if (!hasMasterConfig) {
+            epicsWithoutMasterConfig.push(epicKey);
+        }
+    }
+    console.log("Epics without 'Master Config' child issues:", epicsWithoutMasterConfig);
+}
+getEpicsWithoutMasterConfig();
+
+
+
