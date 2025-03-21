@@ -14,15 +14,22 @@ var deco = function () {
   };
 
 
-var decofun = function(obj,func,predict,extrafunc){
-     obj[func] = function(){
-        if((predict || function(){return true})(arguments)){
-          extrafunc && extrafunc(arguments);
-		  return obj.__proto__[func].call(obj,arguments);
+var deco_func = function (obj, func, predict, extrafunc) {
+  var originalFunc = obj[func];
+  obj[func] = function () {
+    if (
+      (
+        predict ||
+        function () {
+          return true;
         }
-              
-     }
-}
+      )(arguments)
+    ) {
+      extrafunc && extrafunc(arguments);
+      return originalFunc.apply(obj, arguments);
+    }
+  };
+};
 
 
 var isSameArrayObjs = (function () {
