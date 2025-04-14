@@ -261,4 +261,55 @@ async function getEpicsWithoutMasterConfig() {
 getEpicsWithoutMasterConfig();
 
 
+function MyPromise(executor) {
+    this.state = "pending"; // pending, fulfilled, rejected
+    this.value = undefined;
+    this.handlers = [];
+
+    const resolve = (value) => {
+        if (this.state !== "pending") return;
+        this.state = "fulfilled";
+        this.value = value;
+
+        // queue microtasks to run handlers
+        queueMicrotask(() => {
+            this.handlers.forEach(h => h(value));
+        });
+    };
+
+    const reject = (reason) => {
+        if (this.state !== "pending") return;
+        this.state = "rejected";
+        this.value = reason;
+        // (you could also add error handlers)
+    };
+
+    try {
+        executor(resolve, reject);
+    } catch (err) {
+        reject(err);
+    }
+}
+
+MyPromise.prototype.then = function (onFulfilled) {
+    return new MyPromise((resolve, reject) => {
+        const wrapped = (value) => {
+            try {
+                const result = onFulfilled(value);
+                resolve(result);
+            } catch (err) {
+                reject(err);
+            }
+        };
+
+        if (this.state === "fulfilled") {
+            queueMicrotask(() => wrapped(this.value));
+        } else {
+            this.handlers.push(wrapped);
+        }
+    });
+};
+
+
+
 
