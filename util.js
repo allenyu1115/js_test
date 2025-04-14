@@ -311,5 +311,50 @@ MyPromise.prototype.then = function (onFulfilled) {
 };
 
 
+function myPromise(executor) {
+    let onResolve;
+    let onReject;
+
+    const resolve = (value) => {
+        // simulate microtask
+        queueMicrotask(() => {
+            if (onResolve) onResolve(value);
+        });
+    };
+
+    const reject = (reason) => {
+        queueMicrotask(() => {
+            if (onReject) onReject(reason);
+        });
+    };
+
+    const then = (callback) => {
+        onResolve = callback;
+        return { then };
+    };
+
+    const catchFn = (callback) => {
+        onReject = callback;
+        return { catch: catchFn };
+    };
+
+    executor(resolve, reject);
+
+    return { then, catch: catchFn };
+}
+
+// === Usage ===
+const p = myPromise((resolve, reject) => {
+    console.log('Inside executor'); 
+    resolve('Success!');
+});
+
+p.then(value => {
+    console.log('Resolved with:', value);
+}).catch(error => {
+    console.log('Rejected with:', error);
+});
+
+
 
 
