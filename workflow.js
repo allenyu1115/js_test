@@ -1,133 +1,151 @@
-var users = ["Mars", "Allen", "Karl"];
 
-var allWorkflows = [];
+    // 1. Core Workflow Template (logic only)
+    const coreWorkflowTemplate1 = {
+      data: {
+        text: "init",
+        assignee: null,
+        isDone: 'no'
+      },
+      steps: [
+        (data, input) => { data.text = input; },
+        (data, input) => { data.assignee = input; },
+        (data, input) => { data.isDone = input; }
+      ]
+    };
 
-var workflowTemplate1 = {
-  data: {
-    text: "init",
-    assignee: null,
-    isDone: 'no'
-  },
-  steps:[
-  function (myWorkflowData, obj) {
-    myWorkflowData.text = obj;
-  },
-  function (myWorkflowData, obj) {
-    myWorkflowData.assignee = obj;
-  },
-  function (myWorkflowData, obj) {
-    myWorkflowData.isDone = obj;
-  }
-]};
+    // 2. UI Configuration for Each Step
+    const users = ["Mars", "Allen", "Karl"];
+    const uiConfig1 = [
+      { input: "text" },
+      { input: "dropdown", options: users },
+      { input: "dropdown", options: ["no", "yes"] }
+    ];
 
-var createWorkflowTemplate = function (workflowTemplate1, initiId) {
-  var count = initiId;
-  return {startNew: function () { 
-    count = count + 1;
-    var myWorkflowData = { ...workflowTemplate1.data };
-    myWorkflowData.id = count;
-    myWorkflowData.history =  "workflow id: " +myWorkflowData.id;
-    
-    var checkWorflowSatus = function (step) {
-      return function (input) {
-        if (!(myWorkflowData.isDone==='yes')) {
-          step(input);
-        } else {
-          myWorkflowData.history = myWorkflowData.history + "-workflow has done";
+    // 3. Wrapper to Merge Core Template with UI Metadata
+    function wrapCoreTemplate(coreTemplate, uiConfig) {
+      return {
+        data: { ...coreTemplate.data },
+        steps: coreTemplate.steps.map((action, index) => {
+          const config = uiConfig[index] || {};
+          return {
+            action,
+            input: config.input || "text",
+            options: config.options || []
+          };
+        })
+      };
+    }
+
+    // 4. Workflow Template Engine
+    function createWorkflowTemplate(wrappedTemplate, initialId) {
+      let count = initialId;
+      return {
+        startNew: function () {
+          count++;
+          const myWorkflowData = { ...wrappedTemplate.data };
+          myWorkflowData.id = count;
+          myWorkflowData.history = "workflow id: " + myWorkflowData.id;
+
+          const checkWorkflowStatus = (step) => (input) => {
+            if (myWorkflowData.isDone !== 'yes') {
+              step(input);
+            } else {
+              myWorkflowData.history += "-workflow has done";
+            }
+          };
+
+          const workflowSteps = [];
+          const myWorkflowGenerated = {
+            getHistory: () => myWorkflowData.history,
+            getId: () => myWorkflowData.id,
+            getWorkflowSteps: () => workflowSteps
+          };
+
+          wrappedTemplate.steps.forEach((stepObj, index) => {
+            const stepName = "step" + (index + 1);
+            workflowSteps.push({ stepName, input: stepObj.input, options: stepObj.options });
+
+            myWorkflowGenerated[stepName] = checkWorkflowStatus((obj) => {
+              stepObj.action(myWorkflowData, obj);
+              myWorkflowData.history += "-workflow changed:" + obj;
+            });
+          });
+
+          return myWorkflowGenerated;
         }
       };
-    };
-    var workflowSteps = [];  
-
-    var myworkflowGnearted = {
-      getHistory: function () {
-        return myWorkflowData.history;
-      },
-      getId: function () {
-        return myWorkflowData.id;
-      },
-
-      getWorkflowSteps(){
-        return workflowSteps;
-      }
-    };
-    var stepIndex = 0;
-    for (var eachStep of workflowTemplate1.steps) {
-      stepIndex = stepIndex + 1;
-      var stepName = "step" + stepIndex;
-      myworkflowGnearted[stepName] = checkWorflowSatus(function (obj) {
-        eachStep(myWorkflowData, obj);
-        myWorkflowData.history = myWorkflowData.history + "-" + "workflow changed:" + obj;
-      });
-    workflowSteps.push(stepName);      
     }
-    return myworkflowGnearted;
-  }};
-};
 
-var myWorkflow = createWorkflowTemplate(workflowTemplate1, 10000);
+    // 5. DOM Utilities
+    const createElement = (tag, id, textContent) => {
+      const element = document.createElement(tag);
+      element.id = id;
+      element.className = id;
+      if (textContent) element.textContent = textContent;
+      return element;
+    };
 
-const createElement = (tag, id, textContent) => {
-  const element = document.createElement(tag);
-  element.id = id;
-  element.className = id;
-  element.textContent = textContent;
-  return element;
-};
-// UI update function
-const renderInitWorkflow = (workflow) => {
-
-  // Helper function to create DOM elements
-  function createDropDown(options, name) {
-    var dropDown = createElement("select", name, name);
-    for (let key in options) {
-        let option = document.createElement("option");
-        option.setAttribute("value", options[key]);
-        let optionText = document.createTextNode(options[key]);
-        option.appendChild(optionText);
+    function createDropDown(options, id) {
+      const dropDown = createElement("select", id);
+      options.forEach((opt) => {
+        const option = document.createElement("option");
+        option.value = opt;
+        option.textContent = opt;
         dropDown.appendChild(option);
+      });
+      return dropDown;
     }
-    return dropDown;
-}
-  const container = document.getElementById("workflow-container");
-  const workflowContainer = createElement("div", "workflow-container" + workflow.getId());
-  container.appendChild(workflowContainer);
-  const historyInfo = createElement("div", "history", "workflow id: " + workflow.getId());
-  workflowContainer.appendChild(historyInfo);
-  const contentDiv = createElement("div", "workflow-content");
-  workflowContainer.appendChild(contentDiv);
 
+    // 6. Render Workflow UI
+    function renderInitWorkflow(workflow) {
+      const container = document.getElementById("workflow-container");
+      const workflowContainer = createElement("div", "workflow-container" + workflow.getId());
+      container.appendChild(workflowContainer);
 
-  [createElement("textarea", "step1_bindingcomp"+ '_' +  workflow.getId(), workflow.text ),
-   createDropDown(users, "step2_bindingcomp"+ '_' +  workflow.getId()),createDropDown(['no','yes'], "step3_bindingcomp"+ '_' +  workflow.getId())].forEach(each=>
-   contentDiv.appendChild(each)
-  );
+      const historyInfo = createElement("div", "history", workflow.getHistory());
+      workflowContainer.appendChild(historyInfo);
 
-  
-  // Create action button area
-  const actionsDiv = createElement("div", "workflow-actions");
-  workflowContainer.appendChild(actionsDiv);
+      const contentDiv = createElement("div", "workflow-content");
+      workflowContainer.appendChild(contentDiv);
 
- workflow.getWorkflowSteps().forEach((eachStep) => {
-    var renderHistory = function (stepName) {
-      return function () {
-        workflow[stepName](document.getElementById(stepName + '_bindingcomp' + '_' +  workflow.getId()).value);
-        historyInfo.textContent = workflow.getHistory();
+      const actionsDiv = createElement("div", "workflow-actions");
+      workflowContainer.appendChild(actionsDiv);
+
+      workflow.getWorkflowSteps().forEach(({ stepName, input, options }) => {
+        const inputId = `${stepName}_bindingcomp_${workflow.getId()}`;
+        let inputEl;
+
+        if (input === "dropdown") {
+          inputEl = createDropDown(options, inputId);
+        } else {
+          inputEl = createElement("input", inputId);
+        }
+
+        contentDiv.appendChild(inputEl);
+
+        const button = createElement("button", stepName, stepName);
+        button.onclick = () => {
+          const value = document.getElementById(inputId).value;
+          workflow[stepName](value);
+          historyInfo.textContent = workflow.getHistory();
+        };
+        actionsDiv.appendChild(button);
+      });
+    }
+
+    // 7. App Initialization
+    document.addEventListener("DOMContentLoaded", () => {
+      const container = document.getElementById("root");
+      const generateButton = createElement("button", "generatenewworkflow", "Generate New Workflow");
+
+      const wrappedTemplate = wrapCoreTemplate(coreWorkflowTemplate1, uiConfig1);
+      const workflowEngine = createWorkflowTemplate(wrappedTemplate, 10000);
+
+      generateButton.onclick = () => {
+        const aWorkflow = workflowEngine.startNew();
+        renderInitWorkflow(aWorkflow);
       };
-    };
-    var eachButton = createElement("button", eachStep, eachStep);
-    actionsDiv.appendChild(eachButton);
-    eachButton.onclick = renderHistory(eachStep);
-  });
-};
-// Initialize workflow when the page loads
-document.addEventListener("DOMContentLoaded", () => {
-  const container = document.getElementById("root");
-  var generateButton = createElement("button", "generatenewworkflow", "generate new workflow");
-  generateButton.onclick = function () {
-    const aWorkflow = myWorkflow.startNew();
-    allWorkflows.push(aWorkflow);
-    renderInitWorkflow(aWorkflow);
-  };
-  container.appendChild(generateButton);
-});
+
+      container.appendChild(generateButton);
+    });
+  
