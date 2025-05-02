@@ -1,5 +1,5 @@
 
-    // 1. Core Workflow Template (logic only)
+    // 1. Core Workflow Template (logic only, now CPS-style)
     const coreWorkflowTemplate1 = {
       data: {
         text: "init",
@@ -7,9 +7,9 @@
         isDone: 'no'
       },
       steps: [
-        (data, input) => { data.text = input; },
-        (data, input) => { data.assignee = input; },
-        (data, input) => { data.isDone = input; }
+        (data, input, cont) => { data.text = input; cont(); },
+        (data, input, cont) => { data.assignee = input; cont(); },
+        (data, input, cont) => { data.isDone = input; cont(); }
       ]
     };
 
@@ -21,7 +21,7 @@
       { input: "dropdown", options: ["no", "yes"] }
     ];
 
-    // 3. Wrapper to Merge Core Template with UI Metadata
+    // 3. Merge Core Logic with UI Metadata
     function wrapCoreTemplate(coreTemplate, uiConfig) {
       return {
         data: { ...coreTemplate.data },
@@ -36,7 +36,7 @@
       };
     }
 
-    // 4. Workflow Template Engine
+    // 4. CPS-Based Workflow Template Engine
     function createWorkflowTemplate(wrappedTemplate, initialId) {
       let count = initialId;
       return {
@@ -46,30 +46,25 @@
           myWorkflowData.id = count;
           myWorkflowData.history = "workflow id: " + myWorkflowData.id;
 
-          const checkWorkflowStatus = (step) => (input) => {
-            if (myWorkflowData.isDone !== 'yes') {
-              step(input);
-            } else {
-              myWorkflowData.history += "-workflow has done";
-            }
-          };
-
-          const workflowSteps = [];
           const myWorkflowGenerated = {
-            getHistory: () => myWorkflowData.history,
             getId: () => myWorkflowData.id,
-            getWorkflowSteps: () => workflowSteps
+            getHistory: () => myWorkflowData.history,
+            getWorkflowData: () => myWorkflowData,
+            runStep: function (index, input, cont) {
+              if (myWorkflowData.isDone === 'yes') {
+                myWorkflowData.history += "-workflow has done";
+                cont();
+                return;
+              }
+              const step = wrappedTemplate.steps[index];
+              step.action(myWorkflowData, input, () => {
+                myWorkflowData.history += "-workflow changed:" + input;
+                cont();
+              });
+            },
+            getStepConfig: (index) => wrappedTemplate.steps[index],
+            getTotalSteps: () => wrappedTemplate.steps.length
           };
-
-          wrappedTemplate.steps.forEach((stepObj, index) => {
-            const stepName = "step" + (index + 1);
-            workflowSteps.push({ stepName, input: stepObj.input, options: stepObj.options });
-
-            myWorkflowGenerated[stepName] = checkWorkflowStatus((obj) => {
-              stepObj.action(myWorkflowData, obj);
-              myWorkflowData.history += "-workflow changed:" + obj;
-            });
-          });
 
           return myWorkflowGenerated;
         }
@@ -78,74 +73,103 @@
 
     // 5. DOM Utilities
     const createElement = (tag, id, textContent) => {
-      const element = document.createElement(tag);
-      element.id = id;
-      element.className = id;
-      if (textContent) element.textContent = textContent;
-      return element;
+      const el = document.createElement(tag);
+      el.id = id;
+      if (textContent) el.textContent = textContent;
+      return el;
     };
 
     function createDropDown(options, id) {
-      const dropDown = createElement("select", id);
-      options.forEach((opt) => {
+      const select = createElement("select", id);
+      options.forEach(opt => {
         const option = document.createElement("option");
         option.value = opt;
         option.textContent = opt;
-        dropDown.appendChild(option);
+        select.appendChild(option);
       });
-      return dropDown;
+      return select;
     }
 
-    // 6. Render Workflow UI
-    function renderInitWorkflow(workflow) {
+    // 6. Render Step-by-Step UI with CPS Navigation
+    function renderWorkflow(workflow) {
       const container = document.getElementById("workflow-container");
-      const workflowContainer = createElement("div", "workflow-container" + workflow.getId());
-      container.appendChild(workflowContainer);
+      const wfContainer = createElement("div", "workflow-" + workflow.getId());
+      container.appendChild(wfContainer);
 
-      const historyInfo = createElement("div", "history", workflow.getHistory());
-      workflowContainer.appendChild(historyInfo);
+      const historyEl = createElement("div", "history", workflow.getHistory());
+      wfContainer.appendChild(historyEl);
 
-      const contentDiv = createElement("div", "workflow-content");
-      workflowContainer.appendChild(contentDiv);
+      const stepDiv = createElement("div", "step-content");
+      wfContainer.appendChild(stepDiv);
 
-      const actionsDiv = createElement("div", "workflow-actions");
-      workflowContainer.appendChild(actionsDiv);
+      const navDiv = createElement("div", "workflow-actions");
+      wfContainer.appendChild(navDiv);
 
-      workflow.getWorkflowSteps().forEach(({ stepName, input, options }) => {
-        const inputId = `${stepName}_bindingcomp_${workflow.getId()}`;
+      let currentStep = 0;
+      const totalSteps = workflow.getTotalSteps();
+      const inputState = [];
+
+      function renderStep() {
+        stepDiv.innerHTML = '';
+        navDiv.innerHTML = '';
+
+        const stepConfig = workflow.getStepConfig(currentStep);
+        const inputId = `input-step-${currentStep}`;
         let inputEl;
 
-        if (input === "dropdown") {
-          inputEl = createDropDown(options, inputId);
+        if (stepConfig.input === "dropdown") {
+          inputEl = createDropDown(stepConfig.options, inputId);
         } else {
           inputEl = createElement("input", inputId);
         }
 
-        contentDiv.appendChild(inputEl);
+        inputEl.className = "workflow-step";
+        if (inputState[currentStep]) inputEl.value = inputState[currentStep];
 
-        const button = createElement("button", stepName, stepName);
-        button.onclick = () => {
-          const value = document.getElementById(inputId).value;
-          workflow[stepName](value);
-          historyInfo.textContent = workflow.getHistory();
+        stepDiv.appendChild(inputEl);
+
+        const backBtn = createElement("button", "back-btn", "Back");
+        backBtn.disabled = currentStep === 0;
+        backBtn.onclick = () => {
+          currentStep--;
+          renderStep();
         };
-        actionsDiv.appendChild(button);
-      });
+
+        const nextBtn = createElement("button", "next-btn", currentStep === totalSteps - 1 ? "Finish" : "Next");
+        nextBtn.onclick = () => {
+          const val = document.getElementById(inputId).value;
+          inputState[currentStep] = val;
+
+          workflow.runStep(currentStep, val, () => {
+            historyEl.textContent = workflow.getHistory();
+            if (currentStep < totalSteps - 1) {
+              currentStep++;
+              renderStep();
+            } else {
+              nextBtn.disabled = true;
+            }
+          });
+        };
+
+        navDiv.appendChild(backBtn);
+        navDiv.appendChild(nextBtn);
+      }
+
+      renderStep();
     }
 
     // 7. App Initialization
     document.addEventListener("DOMContentLoaded", () => {
       const container = document.getElementById("root");
-      const generateButton = createElement("button", "generatenewworkflow", "Generate New Workflow");
+      const generateBtn = createElement("button", "generate-btn", "Generate New Workflow");
+      container.appendChild(generateBtn);
 
-      const wrappedTemplate = wrapCoreTemplate(coreWorkflowTemplate1, uiConfig1);
-      const workflowEngine = createWorkflowTemplate(wrappedTemplate, 10000);
+      const wrapped = wrapCoreTemplate(coreWorkflowTemplate1, uiConfig1);
+      const engine = createWorkflowTemplate(wrapped, 1000);
 
-      generateButton.onclick = () => {
-        const aWorkflow = workflowEngine.startNew();
-        renderInitWorkflow(aWorkflow);
+      generateBtn.onclick = () => {
+        const wf = engine.startNew();
+        renderWorkflow(wf);
       };
-
-      container.appendChild(generateButton);
     });
   
