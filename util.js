@@ -12,6 +12,21 @@ var deco = function () {
         });
     });
   };
+  
+  
+var bind = function (f, this_value) {
+return function () {return f.apply (this_value, arguments)};
+};
+
+
+var metaclass = {methods: {
+add_to: function (o) {
+var t = this;
+keys (this.methods).each (function (k) {
+o[k] = bind (t.methods[k], o); });
+return o}}};
+metaclass.methods.add_to.call (metaclass, metaclass);
+
 
 
 var deco_func = function (obj, func, predict, extrafunc) {
