@@ -22,7 +22,7 @@ return function () {return f.apply (this_value, arguments)};
 var jsclass = {methods: {
 add_to: function (o) {
 var t = this;
-keys (this.methods).each (function (k) {
+Object.keys (this.methods).each (function (k) {
 o[k] = bind (t.methods[k], o); });
 return o}}};
 jsclass.methods.add_to.call (jsclass, jsclass);
